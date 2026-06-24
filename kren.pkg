@@ -1,0 +1,416 @@
+import math, random, os, time, select, textwrap, sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont, QIcon
+
+# kren __pkg__
+# generate data
+def gen_rect(h:int, w:int, char:str):
+    """
+    .......
+    .......
+    .......  rect=gen_rect(5,7,".")
+    .......
+    .......
+    """
+    ow=''; oh=[]
+    while w>0: ow=f'{ow}{char}'; w=w-1
+    while h>0: oh.append(ow); h=h-1
+    return oh
+
+def gen_square(size:int, char:str):
+    """
+    ^^^^
+    ^^^^  square=gen_square(4,'^')
+    ^^^^
+    ^^^^
+    """
+    ow=''; oh=[]; w=size; h=size
+    while w>0: ow=f'{ow}{char}'; w=w-1
+    while h>0: oh.append(ow); h=h-1
+    return oh
+
+def gen_circle(r:int, char:str):
+    """
+    ???@@@???
+    ?@@@@@@@?
+    ?@@@@@@@?
+    @@@@@@@@@   circle=gen_circle(4,"@")
+    @@@@@@@@@   ? is transparent when placed with place_sprite
+    @@@@@@@@@
+    ?@@@@@@@?
+    ?@@@@@@@?
+    ???@@@???
+    """
+    size=(r*2)+1; grid=[]
+    for y in range(size):
+        row=""
+        for x in range(size):
+            dx=x-r; dy=y-r; dist=math.sqrt(dx**2+dy**2)
+            if dist<=r+0.4: row+=char
+            else: row+="?"
+        grid.append(row)
+    return grid
+
+def gen_render(item: list):
+    """sprite data ['row1','row2','row3'] to printable str using \\n(newlines)"""
+    newdata='\n'.join(item); return newdata
+
+def gen_bar(length:int, char:str='-'):
+    """----    gen_bar(4)"""
+    return [f'{char*length}']
+
+def gen_star(size:int, border:str='#', fill:str="*")->list:
+    """
+    ??#??
+    ?#*#?
+    #***#   star=gen_star(2,'#','*')
+    ?#*#?   ? is transparent when placed with place_sprite
+    ??#??
+    """
+    grid_size=(size*2)+1; grid=[]
+    for y in range(grid_size):
+        row=""
+        for x in range(grid_size):
+            dist=abs(x-size)+abs(y-size)
+            if dist==size: row+=border
+            elif dist<size: row+=fill
+            else: row+="?"
+        grid.append(row)
+    return grid
+
+def gen_line(y1: int, x1: int, y2: int, x2: int, char: str) -> list:
+    """Generates a sprite containing a line from (y1,x1) to (y2,x2)."""
+    h=max(y1,y2)+1; w=max(x1,x2)+1; grid=[["?"for _ in range(w)]for _ in range(h)]
+    dy=abs(y2-y1); sy=1 if y1<y2 else-1; dx=-abs(x2-x1); sx=1 if x1<x2 else-1; err=dx+dy; curr_y,curr_x=y1,x1
+    while True:
+        grid[curr_y][curr_x]=char
+        if curr_y == y2 and curr_x == x2: break
+        e2=2 * err
+        if e2>=dx: err+=dx; curr_y+=sy
+        if e2<=dy: err+=dy; curr_x+=sx
+    return ["".join(row) for row in grid]
+
+def gen_ui_bar(current:int, maximum:int, length:int, fill:str='█', empty:str='░'):
+    """Generates a health/mana bar: [████░░░]"""
+    filled_len=int(length*current//maximum)
+    bar=fill*filled_len+empty*(length-filled_len)
+    return [f"[{bar}]"]
+
+def gen_dialog(text:str, width:int):
+    """Wraps text into a bordered box for NPCs or alerts."""
+    lines=textwrap.wrap(text,width-4)
+    bordered_lines=border(1,lines)
+    return bordered_lines
+
+def gen_cave(h:int, w:int, steps:int, char:str="#", floor:str=".")->list:
+    """Generates a cave-like structure using a random walk algorithm."""
+    canvas=[[char for _ in range(w)]for _ in range(h)]; y,x=h//2,w//2
+    for _ in range(steps):
+        canvas[y][x]=floor
+        y+=random.choice([-1,0,1]); x+=random.choice([-1,0,1])
+        y=max(1,min(h-2,y)); x=max(1,min(w-2,x))
+    return ["".join(row)for row in canvas]
+
+# edit data
+def place_char(char:str, sprite:list, y:int, x:int):
+    """place pixel("char") at a pos on a sprite"""
+    newdat=sprite[y]; newdat=list(newdat); newdat[x]=char; sprite[y]=''.join(newdat); return sprite
+
+def place_sprite(sprite: list, item: list, y: int, x: int):
+    """
+    Places sprite on item using (y,x) as the TOP-LEFT corner.
+    '?' in the sprite is treated as transparent.
+    """
+    sprite_h=len(sprite); sprite_w=len(sprite[0])
+    for sy in range(sprite_h):
+        for sx in range(sprite_w):
+            char=sprite[sy][sx]
+            if char=="?": continue
+            ty,tx=y+sy,x+sx
+            if 0<=ty<len(item)and 0<=tx<len(item[0]):
+                row_list=list(item[ty]); row_list[tx]=char; item[ty]="".join(row_list)
+    return item
+
+def square_sprite(sprite: list, control: str="?"):
+    """
+    4444
+    333         jagged_data=['4444','333','55555','88']
+    55555
+    88
+
+    --------    # ? is replaced with the pixel of the item(place_sprite)
+
+    4444?
+    333??       my_manual_sprite=square_sprite(jagged_data,"?")
+    55555
+    88???
+    """
+    if not sprite: return []
+    max_w=0
+    for row in sprite:
+        if len(row)>max_w: max_w=len(row)
+    squared_sprite=[]
+    for row in sprite:
+        padding=max_w-len(row); new_row=row+(control*padding); squared_sprite.append(new_row)
+    return squared_sprite
+
+def append_text(text:str, item:list, y:int, x:int):
+    """Places text on item starting at (y,x) as the TOP-LEFT."""
+    sprite=[text]; sprite_w=len(text)
+    for sx in range(sprite_w):
+        char=sprite[0][sx]; ty,tx=y,x+sx
+        if 0<=ty<len(item)and 0<=tx<len(item[0]):
+            row_list=list(item[ty]); row_list[tx]=char; item[ty]="".join(row_list)
+    return item
+
+def flip_h(sprite:list)->list:
+    """Reverse the order of characters in each row."""
+    return [row[::-1] for row in sprite]
+
+def flip_v(sprite:list)->list:
+    """Reverse the order of the rows in the sprite."""
+    return sprite[::-1]
+
+def rotate_90(sprite:list)->list:
+    """Rotate sprite 90 degrees clockwise. Note: This will swap height and width."""
+    if not sprite: return []
+    new_w=len(sprite); new_h=len(sprite[0]); rotated=[]
+    for x in range(new_h):
+        new_row=""
+        for y in range(new_w-1,-1,-1): new_row += sprite[y][x]
+        rotated.append(new_row)
+    return rotated
+
+def load_sprite(filename: str) -> list:
+    """Reads a .txt file and returns it as a list of strings (sprite)."""
+    try:
+        with open(filename,'r') as f: return [line.rstrip('\n') for line in f.readlines()]
+    except FileNotFoundError: return [f"Error: {filename} not found"]
+
+def save_sprite(sprite: list, filename: str):
+    """Saves sprite data to a text file."""
+    with open(filename,'w') as f:
+        for row in sprite: f.write(row+'\n')
+
+# effects
+def border(style:int|list, sprite:list)->list:
+    """
+    #################################################  0     1      2      3
+    style=pallet id(int) or list["|","#","#","+"] # side,top,bottom,corner
+    item=sprite to be bordered
+    """
+    go=0
+    if type(style)!=list: styles={0:['|','_','-','~'],1:['|','-','-','+'],2:['#','#','#','#']}; styles=styles[style]; go=1
+    else:
+        if len(style)==4: styles=style; go=1
+    if go==1:
+        c=0; out=[]
+        for i in sprite:
+            if c==0: out.append(f'{styles[3]}{gen_bar(len(i),styles[1])[0]}{styles[3]}')
+            out.append(f'{styles[0]}{i}{styles[0]}')
+            if c==len(sprite)-1: out.append(f'{styles[3]}{gen_bar(len(i),styles[2])[0]}{styles[3]}')
+            c+=1
+        return out
+    else: print("Invalid style format provided."); return None
+
+def disolve(sprite:list, amount:int|list, blankchar:str='?'):
+    """
+    replace random pixels with ? #int #int
+    amount=number of pixels flipped(int) or random amounnt in range(list) [min,max]
+    """
+    height=len(sprite); ran=0
+    if type(amount)==int: counter=amount
+    elif type(amount)==list: counter=random.randint(amount[0],amount[1])
+    else: return None
+    while counter>0:
+        row=random.randint(0,height-1); rowdat=sprite[row]; pixel=random.randint(0,len(rowdat)-1)
+        place_char(blankchar,sprite,row,pixel); counter=counter-1; ran=1
+    if ran==1: return sprite
+    else: return None
+
+def horz_interlace(sprite1:list, sprite2:list)->list:
+    """Interlace rows from sprite 1 and 2"""
+    height=min(len(sprite1),len(sprite2)); result=[]
+    for i in range(height):
+        if i%2==0: result.append(sprite1[i])
+        else: result.append(sprite2[i])
+    return result
+
+def vert_interlace(sprite1:list, sprite2:list)->list:
+    """Interlace columns from sprite 1 and 2"""
+    result=[]; height=min(len(sprite1),len(sprite2))
+    for i in range(height):
+        row1=sprite1[i]; row2=sprite2[i]; width=min(len(row1),len(row2)); new_row=""
+        for j in range(width):
+            if j%2==0: new_row+=row1[j]
+            else: new_row+=row2[j]
+        result.append(new_row)
+    return result
+
+# logic
+def check_collision(s1:list, y1:int, x1:int, s2:list, y2:int, x2:int)->bool:
+    """
+    Returns True if non-'?' pixels of sprite1 at (y1,x1)
+    overlap with non-'?' pixels of sprite2 at (y2,x2).
+    Assumes (y,x) is the top-left corner of the sprite.
+    """
+    h1,w1=len(s1),len(s1[0]); h2,w2=len(s2),len(s2[0])
+    if(x1<x2+w2 and x1+w1>x2 and y1<y2+h2 and y1+h1>y2):
+        for r1 in range(h1):
+            for c1 in range(w1):
+                if s1[r1][c1]=="?": continue
+                world_y,world_x=y1+r1,x1+c1; r2,c2=world_y-y2,world_x-x2
+                if 0<=r2<h2 and 0<=c2<w2:
+                    if s2[r2][c2]!="?": return True
+    return False
+
+# class
+# GAME
+class GameClock:
+    def __init__(self, fps:int=5):
+        self.fps=fps; self.delta=1.0/fps; self.last_tick=time.time()
+    def tick(self):
+        elapsed=time.time()-self.last_tick; wait=self.delta-elapsed
+        if wait>0: time.sleep(wait)
+        self.last_tick=time.time()
+        os.system('cls'if os.name=='nt'else'clear')
+
+class Texture:
+    def __init__(self, data:list):
+        self.data=square_sprite(data)
+        self.h=len(self.data)
+        self.w=len(self.data[0])
+    def get_flipped_h(self): return flip_h(self.data)
+    def get_rotated(self): return rotate_90(self.data)
+
+class Animation:
+    def __init__(self, frames: list, interval: int=5):
+        """frames should be a list of Texture objects or raw lists"""
+        self.frames=[f.data if isinstance(f,Texture) else f for f in frames]
+        self.interval=interval; self.counter=0; self.index=0
+    def get_frame(self):
+        """Returns the current frame and handles the timing logic."""
+        self.counter+=1
+        if self.counter>=self.interval:
+            self.counter=0
+            self.index=(self.index+1)%len(self.frames)
+        return self.frames[self.index]
+
+class Camera:
+    def __init__(self, h:int, w:int, y:int=0, x:int=0):
+        self.h=h; self.w=w; self.y=y; self.x=x
+    def follow(self, target_y:int, target_x:int, world_h:int, world_w:int):
+        """Centers the camera on a coordinate,staying within world bounds."""
+        self.y=max(0,min(target_y-self.h//2,world_h-self.h))
+        self.x=max(0,min(target_x-self.w//2,world_w-self.w))
+    def render_view(self, world_canvas:list)->list:
+        """Crops the world canvas to what the camera can see."""
+        view=[]
+        for r in range(self.y,min(self.y+self.h,len(world_canvas))):
+            view.append(world_canvas[r][self.x:self.x+self.w])
+        return view
+
+class Entity:
+    def __init__(self, texture, y:int=0, x:int=0):
+        self.texture=texture.data if isinstance(texture,Texture) else texture
+        self.y=y; self.x=x; self.h=len(self.texture); self.w=len(self.texture[0])
+    def draw(self, canvas:list):
+        place_sprite(self.texture,canvas,self.y,self.x)
+    def move(self, dy:int, dx:int, world_bounds:tuple=None):
+        self.y+=dy; self.x+=dx
+        if world_bounds:
+            self.y=max(0,min(self.y,world_bounds[0]-self.h))
+            self.x=max(0,min(self.x,world_bounds[1]-self.w))
+
+# Updated Scene class in kren.pkg
+class Scene:
+    def __init__(self):
+        self.entities = []
+        self.world_h = 40
+        self.world_w = 100
+        self.bg_char = " "
+        self.background_map = None # New: Store the static map here
+    def render(self, camera: Camera):
+        if self.background_map: self.world_canvas= [row for row in self.background_map]
+        else: self.world_canvas= gen_rect(self.world_h, self.world_w, self.bg_char)
+        for ent in self.entities: ent.draw(self.world_canvas)
+        return camera.render_view(self.world_canvas)
+
+class SceneManager:
+    def __init__(self, initial_scene): self.current_scene=initial_scene
+    def switch(self, new_scene): self.current_scene=new_scene
+    def run_frame(self, camera, clock):
+        self.current_scene.update()
+        view=self.current_scene.render(camera)
+        print(gen_render(view)); clock.tick()
+
+class Input:
+    @staticmethod
+    def get_key():
+        """Handles single keys and Arrow Key escape sequences."""
+        if sys.stdin in select.select([sys.stdin],[],[],0)[0]:
+            key=sys.stdin.read(1)
+            if key=='\x1b':
+                seq=sys.stdin.read(2); arrows={'[A':'UP','[B':'DOWN','[C':'RIGHT','[D':'LEFT'}
+                return arrows.get(seq,'ESC')
+            return key
+        return None
+
+class PhysicsBody(Entity):
+    def __init__(self, texture, y=0, x=0):
+        super().__init__(texture,y,x); self.vy=0; self.vx=0; self.gravity=0.5
+    def apply_physics(self, world_bounds):
+        self.vy+=self.gravity; self.y+=int(self.vy); self.x+=int(self.vx)
+        if self.y>=world_bounds[0]-self.h: self.y=world_bounds[0]-self.h; self.vy=0
+
+# MATH
+class Vec2:
+    def __init__(self, y:float, x:float): self.y=y; self.x=x
+    def __add__(self, other): return Vec2(self.y+other.y,self.x+other.x)
+    def __sub__(self, other): return Vec2(self.y-other.y,self.x-other.x)
+    def to_tuple(self): return(int(self.y),int(self.x))
+    def dist_to(self, other): return math.sqrt((self.y-other.y)**2+(self.x-other.x)**2)
+
+# WINDOW
+class KrenViewer(QMainWindow):
+    def __init__(self, title="Kren Engine", width=800, height=600):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.resize(width, height)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.layout = QVBoxLayout(self.central_widget)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.display = QLabel("")
+        self.display.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self.font = QFont("Courier New", 10)
+        self.font.setStyleHint(QFont.Monospace)
+        self.display.setFont(self.font)
+        self.setStyleSheet("background-color: black; color: #00FF00;")
+        self.layout.addWidget(self.display)
+        self.show()
+
+    def display_frame(self, frame_str: str):
+        """Updates the window with the rendered string from gen_render."""
+        self.display.setText(frame_str)
+
+    def display_upscaled_frame(self, frame_data: list, scale: int = 2):
+        """Upscales raw sprite list data before rendering."""
+        upscaled = []
+        for row in frame_data:
+            new_row = "".join([char * scale for char in row])
+            for _ in range(scale): upscaled.append(new_row)
+        self.display.setText(gen_render(upscaled))
+
+    # --- Window Management ---
+    def set_title(self, title: str): self.setWindowTitle(title)
+    def set_icon(self, icon_path: str): self.setWindowIcon(QIcon(icon_path))
+    def set_font_size(self, size: int): self.font.setPointSize(size); self.display.setFont(self.font)
+    def get_size(self): return self.width(), self.height()
+    def set_size(self, w: int, h: int): self.resize(w, h)
+    def toggle_fullscreen(self):
+        if self.isFullScreen(): self.showNormal()
+        else: self.showFullScreen()
+    def minimise(self): self.showMinimized()
+    def exit_viewer(self): self.close()

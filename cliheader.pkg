@@ -1,0 +1,3 @@
+# cliheader __main__
+script_name='KCODEHELPERPLACEHOLD1';auth='KCODEHELPERPLACEHOLD2';w=max(len(script_name),len(auth));print(script_name.center(w));print(auth.center(w))
+#

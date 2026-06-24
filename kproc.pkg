@@ -1,0 +1,7 @@
+import subprocess; import sys
+# kproc __pkg__
+def execute(c:str, v:bool=False)->str:
+    """#######execute c=cmd v=verbose\n# runs shell command, returns stdout\n#######""";r=subprocess.run(c,shell=True,capture_output=True,text=True); print(r.stdout) if v else None; return r.stdout.strip()
+def sysinfo()->dict:
+    """#######sysinfo\n# returns basic platform info\n#######"""; return {'os':sys.platform,'pid':os.getpid(),'args':sys.argv}
+#

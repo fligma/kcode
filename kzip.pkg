@@ -1,0 +1,15 @@
+import zipfile; import shutil; import os
+# kzip __pkg__
+def kzip(o:str, s:str, d:str="")->str:
+    """#######kzip o=op s=src d=dest\n# (ops)\n#  'z' = zip file/dir\n#  'u' = unzip to dir\n#######""";
+    try:
+        if o=='z':
+            if os.path.isdir(s): shutil.make_archive(d.replace('.zip',''),'zip',s)
+            else: 
+                with zipfile.ZipFile(d,'w',zipfile.ZIP_DEFLATED) as z: z.write(s,os.path.basename(s))
+            return f"Zipped to {d}"
+        if o=='u':
+            with zipfile.ZipFile(s,'r') as z: z.extractall(d)
+            return f"Extracted to {d}"
+    except Exception as e: return f"Error: {e}"
+#

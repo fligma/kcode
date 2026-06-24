@@ -1,0 +1,36 @@
+import sys,os,datetime,shlex
+# kcli __pkg__
+cmds={
+ "help":lambda a:print("help echo time date clear exit pwd ls cd cat write rm mkdir rmdir whoami sys args"),
+ "echo":lambda a:print(" ".join(a)),
+ "time":lambda a:print(datetime.datetime.now().strftime("%H:%M:%S")),
+ "date":lambda a:print(datetime.datetime.now().strftime("%Y-%m-%d")),
+ "clear":lambda a:os.system("cls" if os.name=="nt" else "clear"),
+ "exit":lambda a:sys.exit(0),
+ "pwd":lambda a:print(os.getcwd()),
+ "ls":lambda a:print("\n".join(os.listdir(a[0] if a else "."))),
+ "cd":lambda a:os.chdir(a[0]) if a else print("cd <dir>"),
+ "cat":lambda a:print(open(a[0]).read()) if a else print("cat <file>"),
+ "write":lambda a:open(a[0],"w").write(" ".join(a[1:])) if len(a)>1 else print("write <file> <text>"),
+ "rm":lambda a:os.remove(a[0]) if a else print("rm <file>"),
+ "mkdir":lambda a:os.makedirs(a[0],exist_ok=True) if a else print("mkdir <dir>"),
+ "rmdir":lambda a:os.rmdir(a[0]) if a else print("rmdir <dir>"),
+ "whoami":lambda a:print(__import__("getpass").getuser()),
+ "sys":lambda a:print(sys.platform),
+ "args":lambda a:print(a)
+}
+def start_cli():
+    if sys.stdin.isatty():
+        while True:
+            try:
+                i=input(">> ").strip()
+                if not i: continue
+                p=shlex.split(i)
+                cmds.get(p[0],lambda a:print("Unknown"))(p[1:])
+            except (EOFError,KeyboardInterrupt):
+                print("\n[EXIT]");break
+            except Exception as e:
+                print("[ERR]",e)
+    else:
+        print("[CLI DISABLED]")
+#

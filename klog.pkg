@@ -1,0 +1,7 @@
+import os; import datetime
+# klog __pkg__
+def lprint(m:str, t:str='i'):
+    """#######logprint t=type m=msg\n# (types)\n#  'i' = info (blue)\n#  's' = success (green)\n#  'e' = error (red)\n#  'w' = warn (yellow)\n#######""";c={'i':'\033[94m','s':'\033[92m','e':'\033[91m','w':'\033[93m','x':'\033[0m'};print(f"{c[t] if t in c else c['i']}[{datetime.datetime.now().strftime('%H:%M:%S')}] {m}{c['x']}")
+def lfile(p:str, m:str):
+    """#######logfile p=path m=msg\n# writes timestamped msg to file\n#######"""; open(p,'a',encoding='utf-8').write(f"[{datetime.datetime.now().isoformat()}] {m}\n")
+#

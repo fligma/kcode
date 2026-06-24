@@ -1,0 +1,20 @@
+import sys; import PyQt6.QtWidgets as qw; import PyQt6.QtCore as qc; import PyQt6.QtGui as qg
+# kqt __pkg__
+def kqt(o:str, t:str="", s:any=None, c:any=None, p:any=None)->any:
+    """#######kqt o=op t=txt/title s=size/icon c=call p=parent\n# (ops)\n#  'i' = init app | 'x' = exec loop\n#  'w'|'g' = win+vbox|grid (returns w, lay)\n#  'b'|'l'|'e' = btn|label|edit (t=txt, c=call, p=lay)\n#  'c'|'k' = combo|check (t=items|txt, c=call, p=lay)\n#  'img' = set p icon/img (t=path, s=size_tuple)\n#  'css' = set p style (t=qss_str)\n#######""";
+    if o=='i': kqt.a=qw.QApplication(sys.argv)
+    if o=='w' or o=='g': w=qw.QWidget(); w.setWindowTitle(t); w.resize(*(s or (400,300))); l=qw.QVBoxLayout() if o=='w' else qw.QGridLayout(); w.setLayout(l); w.show(); return w, l
+    if o=='b': r=qw.QPushButton(t); r.clicked.connect(c) if c else None
+    if o=='l': r=qw.QLabel(t)
+    if o=='e': r=qw.QLineEdit(); r.setPlaceholderText(t); r.textChanged.connect(c) if c else None
+    if o=='c': r=qw.QComboBox(); r.addItems(t.split(',') if isinstance(t,str) else t); r.currentTextChanged.connect(c) if c else None
+    if o=='k': r=qw.QCheckBox(t); r.stateChanged.connect(c) if c else None
+    if o=='img' and p: p.setPixmap(qg.QPixmap(t).scaled(*s, qc.Qt.AspectRatioMode.KeepAspectRatio)) if isinstance(p, qw.QLabel) else p.setWindowIcon(qg.QIcon(t)); return
+    if o=='css' and p: p.setStyleSheet(t); return
+    if o=='m': qw.QMessageBox.information(None, "Notice", t); return
+    if o=='q': r, ok = qw.QInputDialog.getText(None, "Input", t); return r if ok else None
+    if o=='f': r, _ = qw.QFileDialog.getOpenFileName(None, t); return r if r else None
+    if 'r' in locals() and p: p.addLayout(r) if isinstance(r, qw.QLayout) else p.addWidget(r)
+    if o=='x': sys.exit(kqt.a.exec())
+    return r
+#

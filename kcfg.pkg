@@ -1,0 +1,11 @@
+import configparser; import os
+# kcfg __pkg__
+def cfgio(o:str, p:str, s:str="", k:str="", v:str="")->any:
+    """#######cfgio o=op p=path s=section k=key v=value\n# (ops)\n#  'r' = read key (returns str)\n#  'w' = write key/value\n#  'd' = get dict of section\n#  's' = check if section exists (returns bool)\n#######""";c=configparser.ConfigParser(); c.read(p) if os.path.exists(p) else None;
+    if o=='r': return c.get(s,k,fallback=None)
+    if o=='d': return dict(c[s]) if s in c else {}
+    if o=='s': return s in c
+    if o=='w': 
+        if s not in c: c.add_section(s)
+        c.set(s,k,v); [c.write(open(p,'w',encoding='utf-8'))]
+#

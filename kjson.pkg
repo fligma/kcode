@@ -1,0 +1,5 @@
+import json
+# kjson __pkg__
+def jio(o:str, p:str, d:dict={})->dict:
+    """#######jio o=op p=path d=data\n# (ops)\n#  'r' = read json\n#  'w' = write json\n#######""";return json.load(open(p,'r',encoding='utf-8')) if o=='r' else json.dump(d,open(p,'w',encoding='utf-8'),indent=4) if o=='w' else {}
+#

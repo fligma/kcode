@@ -1,0 +1,18 @@
+import requests; import json; import sys
+# knet __pkg__
+def kreq(o:str, u:str, d:dict={}, h:dict={}, p:str="")->any:
+    """#######kreq o=op u=url d=data h=headers p=path\n# (ops)\n#  'g' = get\n#  'p' = post (json)\n#  'f' = post (form)\n#  'd' = download binary with % progress\n#######""";h.update({'User-Agent':'k-code/1.0'});
+    try:
+        if o=='g': r=requests.get(u,params=d,headers=h)
+        if o=='p': r=requests.post(u,json=d,headers=h)
+        if o=='f': r=requests.post(u,data=d,headers=h)
+        if o=='d':
+            r=requests.get(u,params=d,headers=h,stream=True); total=int(r.headers.get('content-length',0)); cur=0
+            with open(p,'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk: f.write(chunk); cur+=len(chunk)
+                    if total: sys.stdout.write(f"\rDownloading: {int(cur/total*100)}%"); sys.stdout.flush()
+            print(f"\nSaved to {p}"); return f"Saved to {p}"
+        return r.json() if 'application/json' in r.headers.get('Content-Type','') else r.text
+    except Exception as e: return f"Error: {e}"
+#
